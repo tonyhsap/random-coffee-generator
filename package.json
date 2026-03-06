@@ -11,6 +11,7 @@
     "generate:date": "npm run build && node dist/main.js generate --date",
     "reset": "echo '{\"rounds\":[]}' > history.json && echo 'History reset.'",
     "undo": "npm run build && node dist/main.js undo",
+    "mark": "npm run build && node dist/main.js mark",
     "test": "jest",
     "test:cov": "jest --coverage",
     "lint": "eslint \"{src}/**/*.ts\" --fix"

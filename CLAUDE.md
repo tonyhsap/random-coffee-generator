@@ -13,12 +13,13 @@ A CLI tool that automatically pairs team members for bi-weekly random coffee mee
 - `npm run generate:dry` — build + preview pairings without writing files
 - `npm run generate:date` — build + generate with `--date YYYY-MM-DD` flag
 - `npm run undo` — build + remove the last generated round
+- `npm run mark -- --round N --pair N` — build + toggle completion status of a pairing
 - `npm run reset` — wipe `history.json` back to empty
 - `npm run test` — run Jest tests
 - `npm run test:cov` — run tests with coverage
 - `npm run lint` — ESLint with auto-fix
 
-Direct CLI usage after build: `node dist/main.js generate [--date YYYY-MM-DD] [--dry-run]` or `node dist/main.js undo`
+Direct CLI usage after build: `node dist/main.js generate [--date YYYY-MM-DD] [--dry-run]` or `node dist/main.js undo` or `node dist/main.js mark --round N --pair N`
 
 ## Architecture
 
@@ -27,6 +28,7 @@ NestJS CLI application using **nest-commander** for command dispatch (not an HTT
 ### Commands (`src/commands/`)
 - **GenerateCommand** — orchestrates pairing generation: loads participants, checks bi-weekly cadence, generates pairings, writes output files, updates history
 - **UndoCommand** — removes the last round from history and deletes its Markdown file
+- **MarkCommand** — toggles `completed` status on a specific pairing (by round + pair index), regenerates Markdown and HTML outputs
 
 ### Services (`src/services/`)
 - **ParticipantsService** — reads and validates `participants.yml` (YAML with `js-yaml`)
@@ -36,7 +38,7 @@ NestJS CLI application using **nest-commander** for command dispatch (not an HTT
 
 ### Key Data Files
 - `participants.yml` — source of truth for team members (YAML array with `name` fields)
-- `history.json` — persisted pairing history (array of rounds with date, pairings, sit-outs)
+- `history.json` — persisted pairing history (array of rounds with date, pairings with optional `completed` flag, sit-outs)
 - `pairings/` — generated Markdown files per round (`YYYY-MM-DD.md`)
 - `docs/index.html` — generated static site showing all rounds (for GitHub Pages)
 
@@ -46,3 +48,5 @@ Pairs are canonicalized as sorted `"A|B"` strings. The algorithm avoids repeatin
 ## CI/CD
 
 GitHub Actions workflow (`.github/workflows/random-coffee.yml`) runs every Monday at 20:00 UTC. Supports `workflow_dispatch` with optional `date` override and `dry_run` toggle. On success, auto-commits changes to `pairings/`, `history.json`, and `docs/`.
+
+A second workflow (`.github/workflows/mark-coffee.yml`) is triggered via `workflow_dispatch` from the HTML site's checkbox UI. It accepts `round` and `pair` inputs, runs the `mark` CLI command, and commits the updated files. The HTML site uses a GitHub PAT (stored in the user's browser localStorage) to dispatch this workflow.

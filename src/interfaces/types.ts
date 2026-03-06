@@ -8,6 +8,7 @@ export interface ParticipantsYaml {
 
 export interface Pairing {
   pair: [string, string];
+  completed?: boolean;
 }
 
 export interface Round {

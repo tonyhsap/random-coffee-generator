@@ -1,0 +1,42 @@
+name: Mark Coffee Completion
+
+on:
+  workflow_dispatch:
+    inputs:
+      round:
+        description: 'Round number'
+        required: true
+        type: string
+      pair:
+        description: 'Pair index (1-based)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  mark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Mark pairing as completed
+        run: node dist/main.js mark --round ${{ github.event.inputs.round }} --pair ${{ github.event.inputs.pair }}
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pairings/ history.json docs/
+          git diff --staged --quiet || git commit -m "☕ Mark round ${{ github.event.inputs.round }} pair ${{ github.event.inputs.pair }} completion"
+          git push

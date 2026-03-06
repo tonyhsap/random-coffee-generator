@@ -118,6 +118,33 @@ export class HistoryService {
     };
   }
 
+  markPairingCompleted(history: History, roundNumber: number, pairIndex: number): History {
+    const roundIdx = history.rounds.findIndex((r) => r.round === roundNumber);
+    if (roundIdx === -1) {
+      throw new Error(`Round ${roundNumber} not found`);
+    }
+
+    const round = history.rounds[roundIdx];
+    const zeroIdx = pairIndex - 1;
+    if (zeroIdx < 0 || zeroIdx >= round.pairings.length) {
+      throw new Error(`Pair index ${pairIndex} out of range (1-${round.pairings.length})`);
+    }
+
+    const updatedPairing = {
+      ...round.pairings[zeroIdx],
+      completed: !round.pairings[zeroIdx].completed,
+    };
+
+    const updatedPairings = [...round.pairings];
+    updatedPairings[zeroIdx] = updatedPairing;
+
+    const updatedRound = { ...round, pairings: updatedPairings };
+    const updatedRounds = [...history.rounds];
+    updatedRounds[roundIdx] = updatedRound;
+
+    return { rounds: updatedRounds };
+  }
+
   canonicalizePair(a: string, b: string): string {
     return [a, b].sort().join('|');
   }

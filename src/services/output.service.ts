@@ -28,11 +28,12 @@ export class OutputService {
     md += `**Round ${result.round}** · ${formattedDate}\n\n`;
     md += `Time to grab a coffee with someone new! Here are this round's pairings:\n\n`;
 
-    md += `| # | Person 1 | Person 2 |\n`;
-    md += `|---|----------|----------|\n`;
+    md += `| # | Person 1 | Person 2 | Done |\n`;
+    md += `|---|----------|----------|------|\n`;
 
     result.pairings.forEach((pairing, index) => {
-      md += `| ${index + 1} | ${pairing.pair[0]} | ${pairing.pair[1]} |\n`;
+      const done = pairing.completed ? 'Yes' : '';
+      md += `| ${index + 1} | ${pairing.pair[0]} | ${pairing.pair[1]} | ${done} |\n`;
     });
 
     if (result.sitOut) {
@@ -41,6 +42,46 @@ export class OutputService {
 
     if (result.resetOccurred) {
       md += `\n> 🔄 _All possible pairings were exhausted — starting a fresh cycle!_\n`;
+    }
+
+    md += `\n---\n\n`;
+    md += `*Generated automatically by Random Coffee ☕*\n`;
+    md += `*Next round: ${formattedNextDate}*\n`;
+
+    return md;
+  }
+
+  generateMarkdownFromRound(round: Round): string {
+    const date = new Date(round.date);
+    const formattedDate = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 14);
+    const formattedNextDate = nextDate.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    let md = `# ☕ Random Coffee Pairings\n\n`;
+    md += `**Round ${round.round}** · ${formattedDate}\n\n`;
+    md += `Time to grab a coffee with someone new! Here are this round's pairings:\n\n`;
+
+    md += `| # | Person 1 | Person 2 | Done |\n`;
+    md += `|---|----------|----------|------|\n`;
+
+    round.pairings.forEach((pairing, index) => {
+      const done = pairing.completed ? 'Yes' : '';
+      md += `| ${index + 1} | ${pairing.pair[0]} | ${pairing.pair[1]} | ${done} |\n`;
+    });
+
+    if (round.sitOut) {
+      md += `\n> 🪑 **Sitting out this round:** ${round.sitOut} _(don't worry, you're first up next time!)_\n`;
     }
 
     md += `\n---\n\n`;
@@ -117,8 +158,10 @@ export class OutputService {
     const date = this.formatShortDate(round.date);
     const rows = round.pairings
       .map(
-        (p, i) =>
-          `          <tr><td>${i + 1}</td><td>${this.escapeHtml(p.pair[0])}</td><td>${this.escapeHtml(p.pair[1])}</td></tr>`,
+        (p, i) => {
+          const checked = p.completed ? ' checked' : '';
+          return `          <tr><td>${i + 1}</td><td>${this.escapeHtml(p.pair[0])}</td><td>${this.escapeHtml(p.pair[1])}</td><td class="done-cell"><input type="checkbox" class="done-check" data-round="${round.round}" data-pair="${i + 1}"${checked}></td></tr>`;
+        },
       )
       .join('\n');
 
@@ -129,7 +172,7 @@ export class OutputService {
     return `      <section id="round-${round.round}" class="round"${isCurrent ? '' : ' style="display:none"'}>
         <h2>Round ${round.round} <span class="date">${date}</span></h2>
         <table>
-          <thead><tr><th>#</th><th>Person 1</th><th>Person 2</th></tr></thead>
+          <thead><tr><th>#</th><th>Person 1</th><th>Person 2</th><th>Done</th></tr></thead>
           <tbody>
 ${rows}
           </tbody>
@@ -157,17 +200,122 @@ ${rows}
     .empty { text-align: center; color: #8b7355; padding: 2rem; }
     code { background: #eee; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.9em; }
     footer { text-align: center; color: #8b7355; font-size: 0.85rem; margin-top: 2rem; }
+    .done-cell { text-align: center; }
+    .done-check { width: 18px; height: 18px; cursor: pointer; accent-color: #6f4e37; }
+    .done-check:disabled { cursor: wait; }
+    .status-indicator { display: inline-block; margin-left: 4px; font-size: 0.8rem; }
   `;
   }
 
   private generateJs(): string {
     return `
+    var REPO_OWNER = 'tonyhsap';
+    var REPO_NAME = 'random-coffee-generator';
+    var WORKFLOW_FILE = 'mark-coffee.yml';
+    var PAT_KEY = 'coffee_github_pat';
+    var CACHE_KEY = 'coffee_done_cache';
+
     function showRound(id) {
-      document.querySelectorAll('.round').forEach(s => s.style.display = 'none');
+      document.querySelectorAll('.round').forEach(function(s) { s.style.display = 'none'; });
       var el = document.getElementById(id);
       if (el) el.style.display = '';
       history.replaceState(null, '', '#' + id);
     }
+
+    function getCache() {
+      try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch(e) { return {}; }
+    }
+
+    function setCache(roundNum, pairIdx, val) {
+      var cache = getCache();
+      cache[roundNum + '-' + pairIdx] = val;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    }
+
+    function applyCachedState() {
+      var cache = getCache();
+      document.querySelectorAll('.done-check').forEach(function(cb) {
+        var key = cb.dataset.round + '-' + cb.dataset.pair;
+        if (cache.hasOwnProperty(key)) {
+          cb.checked = cache[key];
+        }
+      });
+    }
+
+    function getPat() {
+      var pat = localStorage.getItem(PAT_KEY);
+      if (pat) return pat;
+      pat = prompt('Enter a GitHub Personal Access Token with actions:write scope to toggle completion status.\\n\\nThis is stored in your browser\\'s localStorage only.');
+      if (pat) {
+        localStorage.setItem(PAT_KEY, pat.trim());
+        return pat.trim();
+      }
+      return null;
+    }
+
+    function triggerWorkflow(roundNum, pairIdx, cb) {
+      var pat = getPat();
+      if (!pat) {
+        cb.checked = !cb.checked;
+        return;
+      }
+
+      cb.disabled = true;
+      var indicator = cb.parentNode.querySelector('.status-indicator');
+      if (!indicator) {
+        indicator = document.createElement('span');
+        indicator.className = 'status-indicator';
+        cb.parentNode.appendChild(indicator);
+      }
+      indicator.textContent = '...';
+
+      setCache(roundNum, pairIdx, cb.checked);
+
+      var url = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/actions/workflows/' + WORKFLOW_FILE + '/dispatches';
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + pat,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ref: 'main',
+          inputs: {
+            round: String(roundNum),
+            pair: String(pairIdx)
+          }
+        })
+      }).then(function(resp) {
+        if (resp.status === 204) {
+          indicator.textContent = 'OK';
+        } else if (resp.status === 401 || resp.status === 403) {
+          localStorage.removeItem(PAT_KEY);
+          indicator.textContent = 'Auth error';
+          cb.checked = !cb.checked;
+          setCache(roundNum, pairIdx, cb.checked);
+        } else {
+          indicator.textContent = 'Error';
+          cb.checked = !cb.checked;
+          setCache(roundNum, pairIdx, cb.checked);
+        }
+        cb.disabled = false;
+        setTimeout(function() { indicator.textContent = ''; }, 3000);
+      }).catch(function() {
+        indicator.textContent = 'Network error';
+        cb.checked = !cb.checked;
+        setCache(roundNum, pairIdx, cb.checked);
+        cb.disabled = false;
+        setTimeout(function() { indicator.textContent = ''; }, 3000);
+      });
+    }
+
+    document.addEventListener('change', function(e) {
+      if (e.target && e.target.classList.contains('done-check')) {
+        triggerWorkflow(e.target.dataset.round, e.target.dataset.pair, e.target);
+      }
+    });
+
     (function() {
       var hash = location.hash.replace('#', '');
       if (hash && document.getElementById(hash)) {
@@ -175,6 +323,7 @@ ${rows}
         var sel = document.getElementById('round-select');
         if (sel) sel.value = hash;
       }
+      applyCachedState();
     })();
   `;
   }
