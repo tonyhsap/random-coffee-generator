@@ -1,1 +1,23 @@
-{"rounds":[]}
+{
+  "rounds": [
+    {
+      "date": "2026-03-09",
+      "round": 1,
+      "pairings": [
+        {
+          "pair": [
+            "Bob",
+            "Charlie"
+          ]
+        },
+        {
+          "pair": [
+            "Alice",
+            "Diana"
+          ]
+        }
+      ],
+      "sitOut": "Eve"
+    }
+  ]
+}
