@@ -1,0 +1,54 @@
+name: Random Coffee Pairing
+
+on:
+  schedule:
+    - cron: '0 20 * * 1'  # Every Monday at 20:00 UTC
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Override pairing date (YYYY-MM-DD)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (do not commit)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Generate pairings
+        run: |
+          ARGS="generate"
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            ARGS="$ARGS --date ${{ github.event.inputs.date }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          node dist/main.js $ARGS
+
+      - name: Commit and push
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pairings/ history.json docs/
+          git diff --staged --quiet || git commit -m "☕ Generate coffee pairings for $(date +%Y-%m-%d)"
+          git push

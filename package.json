@@ -1,0 +1,34 @@
+{
+  "name": "random-coffee",
+  "version": "1.0.0",
+  "description": "Automatically pairs team members for bi-weekly random coffee meetings",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "generate": "npm run build && node dist/main.js generate",
+    "generate:dry": "npm run build && node dist/main.js generate --dry-run",
+    "generate:date": "npm run build && node dist/main.js generate --date",
+    "reset": "echo '{\"rounds\":[]}' > history.json && echo 'History reset.'",
+    "undo": "npm run build && node dist/main.js undo",
+    "test": "jest",
+    "test:cov": "jest --coverage",
+    "lint": "eslint \"{src}/**/*.ts\" --fix"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "nest-commander": "^3.12.0",
+    "js-yaml": "^4.1.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/js-yaml": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.0.0"
+  }
+}
