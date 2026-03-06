@@ -14,7 +14,8 @@
           "pair": [
             "Alice",
             "Diana"
-          ]
+          ],
+          "completed": true
         }
       ],
       "sitOut": "Eve"
